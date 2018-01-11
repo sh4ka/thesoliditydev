@@ -37,5 +37,8 @@ class Blockchain:
         
     def deploy_contract(self, contract_interface):
         contract = self.w3.eth.contract(abi=contract_interface['abi'], bytecode=contract_interface['bin'])
-        tx_hash = contract.deploy(transaction={'from': self.w3.eth.accounts[0], 'gas': 410000})
+        tx_hash = contract.deploy(transaction={'from': self.w3.eth.accounts[0], 'gas': 500000000000000})
         return tx_hash
+        
+    def getAccount(self, num):
+        return self.w3.eth.accounts[num]

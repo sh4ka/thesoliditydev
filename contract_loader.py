@@ -25,10 +25,13 @@ class ContractLoader:
     db = None # Database class
     bch = None # blockchain class for contract operation
     
-    def __init__(self, name):
+    redeploy = False
+    
+    def __init__(self, name, redeploy):
         self.init_db()
         self.init_blockchain()
         self.contract_name = name
+        self.redeploy = redeploy
     
     def load(self):
         file = self.get_file(self.get_fullpath(self.contract_name))
@@ -39,20 +42,19 @@ class ContractLoader:
             contract_interface = compiled_sol[interface_name]
             # web3.py instance
             self.tx_hash = self.db.get_hash(self.contract_name)
-            if self.tx_hash is not None:
-                self.contract_address = self.bch.get_contract_address(self.tx_hash)
-                contract_instance = self.bch.get_contract_instance(
-                    contract_interface['abi'],
-                    self.contract_address,
-                    ConciseContract
-                )
-                print(contract_instance.accumulated())
-            else:
+            if self.tx_hash is None or self.redeploy == False:
                 # deploy new contract and store result
                 self.tx_hash = self.bch.deploy_contract(contract_interface)
+                stored_id = self.db.store_hash(self.contract_name, self.tx_hash)
                 print('Deployed: {}'.format(self.tx_hash))
-                print('Storing: {}'
-                .format(self.db.store_hash(self.contract_name, self.tx_hash)))
+                print('Stored: {}'.format(stored_id))
+            self.contract_address = self.bch.get_contract_address(self.tx_hash)
+            contract_instance = self.bch.get_contract_instance(
+                contract_interface['abi'],
+                self.contract_address,
+                ConciseContract
+            )
+            self.interact_with_lottery(contract_instance)
         if self.db:
             self.db.close()
     
@@ -75,14 +77,23 @@ class ContractLoader:
             # Solidity source code only
             return open(file, 'r')
         return None
-
-    
+        
+    def interact_with_lottery(self, contract_interface):
+        print('Accumulated: {}'.format(contract_interface.accumulated()))
+        account0 = self.bch.getAccount(0) #owner
+        account1 = self.bch.getAccount(1) #owner
+        contract_interface.placeBet(12345, transact={
+            'from': account1,
+            'gas': 500000000000000
+        })
+        print('Accumulated: {}'.format(contract_interface.accumulated()))
         
 
 parser = argparse.ArgumentParser(description='Load a contract.')
 parser.add_argument('name', metavar='name', type=str, nargs='?',
 help='contract name to be loaded from ./contracts')
+parser.add_argument('-f', '--force', action='store_true')
 args = parser.parse_args()
 
-x = ContractLoader(args.name)
+x = ContractLoader(args.name, args.force)
 x.load()
