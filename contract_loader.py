@@ -9,7 +9,6 @@ from web3 import Web3, HTTPProvider, TestRPCProvider
 from solc import compile_source
 from web3.contract import ConciseContract
 
-import classes.database as contracts_db
 import classes.blockchain as blockchain
 
 class ContractLoader:
@@ -20,15 +19,14 @@ class ContractLoader:
     contract_extension = 'sol'
     contract_path = './contracts/'
     contract_address = ''
+    contract_instance = None
     tx_hash = ''
     
-    db = None # Database class
     bch = None # blockchain class for contract operation
     
     redeploy = False
     
     def __init__(self, name, redeploy):
-        self.init_db()
         self.init_blockchain()
         self.contract_name = name
         self.redeploy = redeploy
@@ -40,26 +38,19 @@ class ContractLoader:
             compiled_sol = compile_source(contract_source_code)
             interface_name = '<stdin>:'+self.contract_name.capitalize()
             contract_interface = compiled_sol[interface_name]
-            # web3.py instance
-            self.tx_hash = self.db.get_hash(self.contract_name)
-            if self.tx_hash is None or self.redeploy == False:
-                # deploy new contract and store result
-                self.tx_hash = self.bch.deploy_contract(contract_interface)
-                stored_id = self.db.store_hash(self.contract_name, self.tx_hash)
-                print('Deployed: {}'.format(self.tx_hash))
-                print('Stored: {}'.format(stored_id))
+            
+            # deploy new contract
+            self.tx_hash = self.bch.deploy_contract(contract_interface)
+            print('Deployed: {}'.format(self.tx_hash))
+            
+            # using the tx_hash of the deployment tx_receipt 
+            # you can get the contract address as many times as you need
             self.contract_address = self.bch.get_contract_address(self.tx_hash)
-            contract_instance = self.bch.get_contract_instance(
+            self.contract_instance = self.bch.get_contract_instance(
                 contract_interface['abi'],
                 self.contract_address,
                 ConciseContract
             )
-            self.interact_with_lottery(contract_instance)
-        if self.db:
-            self.db.close()
-    
-    def init_db(self):
-        self.db = contracts_db.ContractsDatabase()
         
     def init_blockchain(self):
         self.bch = blockchain.Blockchain()
@@ -78,15 +69,15 @@ class ContractLoader:
             return open(file, 'r')
         return None
         
-    def interact_with_lottery(self, contract_interface):
-        print('Accumulated: {}'.format(contract_interface.accumulated()))
+    def interact(self):
+        print('Accumulated: {}'.format(self.contract_instance.accumulated()))
         account0 = self.bch.getAccount(0) #owner
         account1 = self.bch.getAccount(1) #owner
-        contract_interface.placeBet(12345, transact={
+        tx_receipt = self.contract_instance.placeBet(12345, transact={
             'from': account1,
-            'gas': 500000000000000
+            'value': 500000000000000
         })
-        print('Accumulated: {}'.format(contract_interface.accumulated()))
+        print('Accumulated: {}'.format(self.contract_instance.accumulated()))
         
 
 parser = argparse.ArgumentParser(description='Load a contract.')
@@ -97,3 +88,4 @@ args = parser.parse_args()
 
 x = ContractLoader(args.name, args.force)
 x.load()
+x.interact()
