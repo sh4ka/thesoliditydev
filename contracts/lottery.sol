@@ -15,12 +15,15 @@ contract Lottery {
     struct Bet {
         address owner;
         uint num;
+        bool prizeWithdrawn;
     }
     
     // list of bets, this is a list of Bet structs
     Bet[] public bets;
     // list of winners to split the price
-    Bet[] public winners;
+    mapping(uint => Bet) public winners;
+    mapping(address => bool) public winningAddresses;
+    uint numberOfWinners;
 
     address public owner;
     uint public winningNumber;
@@ -46,7 +49,7 @@ contract Lottery {
     
     modifier onlyWinners() {
         bool isAWinner = false;
-        for(uint i = 0; i <= winners.length; i++){
+        for(uint i = 0; i < numberOfWinners; i++){
             if(msg.sender == winners[i].owner) {
                 isAWinner = true;
                 break;
@@ -77,7 +80,7 @@ contract Lottery {
             numberOfBets += 1;
             amountAccummulated += msg.value;
             bets.push(
-                Bet({owner: msg.sender, num: _num})
+                Bet({owner: msg.sender, num: _num, prizeWithdrawn: false})
             );
         }
     }
@@ -98,23 +101,29 @@ contract Lottery {
         state = State.Closed;
     }
     
+    function getPricePerWinner() public view returns (uint) {
+        return prizePerWinner;
+    }
+    
     function withdrawAccumulated() public onlyWinners notOwner inState(State.Ended) {
-        uint amount = prizePerWinner;
-        // this is to zero the pending refund before
-        // sending to prevent re-entrancy attacks
+        bool hasWithdrawn = winningAddresses[msg.sender];
+        require(hasWithdrawn == false);
+        require(amountAccummulated > 0);
+        winningAddresses[msg.sender] = true;
         amountAccummulated -= prizePerWinner;
-        msg.sender.transfer(amount);
+        msg.sender.transfer(prizePerWinner);
     }
     
     function setWinningNumber(uint _num) public onlyOwner inState(State.Closed) {
         winningNumber = _num;
         state = State.Ended;
-        for(uint i = 0; i <= numberOfBets; i++ ) {
+        for(uint i = 0; i < bets.length; i++ ) {
             if(bets[i].num == winningNumber) {
-                winners.push(bets[i]);
+                winners[numberOfWinners] = bets[i];
+                numberOfWinners += 1;
             }
-            if(winners.length > 0){
-                prizePerWinner = amountAccummulated / winners.length;
+            if(numberOfWinners > 0){
+                prizePerWinner = (amountAccummulated / numberOfWinners);
             }
         }
     }

@@ -1,5 +1,4 @@
 import os.path
-import sqlite3
 import argparse
 
 import json
@@ -11,7 +10,7 @@ from web3.contract import ConciseContract
 
 import classes.blockchain as blockchain
 
-class ContractLoader:
+class ContractLoader(object):
     
     parser = None
     
@@ -24,12 +23,9 @@ class ContractLoader:
     
     bch = None # blockchain class for contract operation
     
-    redeploy = False
-    
-    def __init__(self, name, redeploy):
+    def __init__(self, name):
         self.init_blockchain()
         self.contract_name = name
-        self.redeploy = redeploy
     
     def load(self):
         file = self.get_file(self.get_fullpath(self.contract_name))
@@ -66,26 +62,12 @@ class ContractLoader:
     def get_file(self, file):
         if os.path.isfile(file):
             # Solidity source code only
+            print('Loaded file: {}'.format(file))
             return open(file, 'r')
         return None
         
-    def interact(self):
-        print('Accumulated: {}'.format(self.contract_instance.accumulated()))
-        account0 = self.bch.getAccount(0) #owner
-        account1 = self.bch.getAccount(1) #owner
-        tx_receipt = self.contract_instance.placeBet(12345, transact={
-            'from': account1,
-            'value': 500000000000000
-        })
-        print('Accumulated: {}'.format(self.contract_instance.accumulated()))
+    def getAccount(self, number):
+        return self.bch.getAccount(number)
         
-
-parser = argparse.ArgumentParser(description='Load a contract.')
-parser.add_argument('name', metavar='name', type=str, nargs='?',
-help='contract name to be loaded from ./contracts')
-parser.add_argument('-f', '--force', action='store_true')
-args = parser.parse_args()
-
-x = ContractLoader(args.name, args.force)
-x.load()
-x.interact()
+    def getBalance(self, account):
+        return self.bch.getBalance(account)
