@@ -22,28 +22,74 @@ contract Bet {
         bool isAWinner;
         bool prizeWithdrawn;
     } 
+    // list of bets, this is a list of Bet structs
+    PlacedBet[] public placedBets;
+    uint numberOfBets = 0;
     
     enum State { Open, Closed, Ended }
+    State public state;
     
     modifier onlyOwner() {
         require(msg.sender == owner);
+        _;
+    }
+    
+    modifier isOpen() {
+        require(state == State.Open);
+        _;
+    }
+    
+    modifier isClosed() {
+        require(state == State.Closed);
+        _;
+    }
+    
+    modifier isEnded() {
+        require(state == State.Ended);
         _;
     }
  
     function Bet(address _proposer) public payable {
         owner = msg.sender;
         proposer = _proposer;
+        state = State.Open;
     }
     
-    function bet() public payable {
-        
+    function openLottery() public isClosed onlyOwner {
+        state = State.Open;
     }
     
-    function setTerms(string _terms) public onlyOwner  {
+    function closeLottery() public isOpen onlyOwner {
+        state = State.Closed;
+    }
+    
+    function endLottery() public isClosed onlyOwner {
+        state = State.Ended;
+    }
+    
+    function bet(string _outcome) public isOpen payable {
+        bytes memory tempEmptyStringTest = bytes(_outcome); // use memory
+        if(tempEmptyStringTest.length != 0){
+            numberOfBets += 1;
+            placedBets.push(
+                PlacedBet(
+                    {
+                        owner: msg.sender,
+                        amount: msg.value,
+                        outcome: _outcome, 
+                        isAWinner: false,
+                        prizeWithdrawn: false
+                    }
+                )
+            );
+        }
+    }
+    
+    function setTerms(string _terms) public isOpen onlyOwner  {
         terms = _terms;
     }
     
-    function setOutcome(string _outcome) public onlyOwner  {
+    function setOutcome(string _outcome) public isOpen onlyOwner  {
         outcome = _outcome;
     }
 }
