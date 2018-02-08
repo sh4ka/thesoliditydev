@@ -25,6 +25,9 @@ contract Bet {
     // list of bets, this is a list of Bet structs
     PlacedBet[] public placedBets;
     uint numberOfBets = 0;
+    PlacedBet[] public winningBets;
+    
+    uint accumulated;
     
     enum State { Open, Closed, Ended }
     State public state;
@@ -55,22 +58,31 @@ contract Bet {
         state = State.Open;
     }
     
-    function openLottery() public isClosed onlyOwner {
+    function openLottery() external isClosed onlyOwner {
         state = State.Open;
     }
     
-    function closeLottery() public isOpen onlyOwner {
+    function closeLottery() external isOpen onlyOwner {
         state = State.Closed;
     }
     
-    function endLottery() public isClosed onlyOwner {
+    function endLottery() external isClosed onlyOwner {
         state = State.Ended;
     }
     
-    function bet(string _outcome) public isOpen payable {
-        bytes memory tempEmptyStringTest = bytes(_outcome); // use memory
-        if(tempEmptyStringTest.length != 0){
+    function setTerms(string _terms) external isOpen onlyOwner  {
+        terms = _terms;
+    }
+    
+    function setOutcome(string _outcome) external isOpen onlyOwner  {
+        outcome = _outcome;
+    }
+    
+    function bet(string _outcome) external isOpen payable {
+        bytes memory tempEmptyStringTest = bytes(_outcome); // use memory here
+        if(tempEmptyStringTest.length != 0 && msg.value > 0){
             numberOfBets += 1;
+            accumulated += msg.value;
             placedBets.push(
                 PlacedBet(
                     {
@@ -85,11 +97,12 @@ contract Bet {
         }
     }
     
-    function setTerms(string _terms) public isOpen onlyOwner  {
-        terms = _terms;
+    function setWinners(string _outcome) external onlyOwner isClosed {
+        for(uint i = 0; i < placedBets.length; i++) {
+            if(keccak256(_outcome) == keccak256(placedBets[i].outcome)) {
+                winningBets.push(placedBets[i]);
+            }
+        }
     }
     
-    function setOutcome(string _outcome) public isOpen onlyOwner  {
-        outcome = _outcome;
-    }
 }
