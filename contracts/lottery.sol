@@ -1,110 +1,130 @@
 pragma solidity ^0.4.19;
  
-/// @title Basic betting system factory
-/// Basic betting system in which a user can propose new bets and create 
-/// their own betting contracts
-/// The contract deployer has to provide a description of the rules to be 
-/// agreed on when creating the bet, the outcomes have to be given in the form
-/// of a regexp
-
-contract Bet {
-
-    address owner;
-    address proposer;
+/// @title Basic lottery
+/// Very basic lottery for learning purposes
+/// The contract owner needs to provide the lucky number using, for example
+/// the UK National Lottery winner or similar in the range 0-99999
+contract Lottery {
     
-    string terms;
-    string outcome;
-    
-    struct PlacedBet {
-        address owner;
-        uint amount;
-        string outcome;
-        bool isAWinner;
-        bool prizeWithdrawn;
-    } 
-    // list of bets, this is a list of Bet structs
-    PlacedBet[] public placedBets;
-    PlacedBet[] winningBets;
-    uint numberOfBets = 0;
-    
+    // lottery states
     enum State { Open, Closed, Ended }
+    // current lottery state
     State public state;
+
+    // bet struct
+    struct Bet {
+        address owner;
+        uint num;
+        bool prizeWithdrawn;
+    }
     
+    // list of bets, this is a list of Bet structs
+    Bet[] public bets;
+    // list of winners to split the price
+    mapping(uint => Bet) public winners;
+    mapping(address => bool) public winningAddresses;
+    uint numberOfWinners;
+
+    address public owner;
+    uint public winningNumber;
+    uint public numberOfBets;
+    uint public amountAccummulated;
+
+    // how much to transfer per winner
+    uint prizePerWinner;
+    
+    // bet size in wei, this is 0.0005 eth ~ $0.60
+    uint betSize = 500000000000000;
+    
+    // some modifiers
     modifier onlyOwner() {
         require(msg.sender == owner);
         _;
     }
     
-    modifier isOpen() {
-        require(state == State.Open);
+    modifier notOwner() {
+        require(msg.sender != owner);
         _;
     }
     
-    modifier isClosed() {
-        require(state == State.Closed);
+    modifier onlyWinners() {
+        bool isAWinner = false;
+        for(uint i = 0; i < numberOfWinners; i++){
+            if(msg.sender == winners[i].owner) {
+                isAWinner = true;
+                break;
+            }
+        }
+        require(isAWinner);
         _;
     }
     
-    modifier isEnded() {
-        require(state == State.Ended);
+    modifier inState(State _state) {
+        require(state == _state);
         _;
     }
- 
-    function Bet(address _proposer) public payable {
+    
+    // contract construct, set here any initial states
+    function Lottery() public {
         owner = msg.sender;
-        proposer = _proposer;
         state = State.Open;
     }
     
-    function openLottery() public isClosed onlyOwner {
-        state = State.Open;
+    function accumulated() public view returns (uint) {
+        return amountAccummulated;
     }
     
-    function closeLottery() public isOpen onlyOwner {
-        state = State.Closed;
-    }
-    
-    function endLottery() public isClosed onlyOwner {
-        state = State.Ended;
-    }
-    
-    function bet(string _outcome) public isOpen payable {
-        bytes memory tempEmptyStringTest = bytes(_outcome); // use memory
-        if(tempEmptyStringTest.length != 0){
+    function placeBet(uint _num) public notOwner inState(State.Open) payable {
+        require(_num >= 0 && _num < 100000); // allowed numbers
+        if(msg.value == betSize) {
             numberOfBets += 1;
-            placedBets.push(
-                PlacedBet(
-                    {
-                        owner: msg.sender,
-                        amount: msg.value,
-                        outcome: _outcome, 
-                        isAWinner: false,
-                        prizeWithdrawn: false
-                    }
-                )
+            amountAccummulated += msg.value;
+            bets.push(
+                Bet({owner: msg.sender, num: _num, prizeWithdrawn: false})
             );
         }
     }
     
-    function chooseWinner() public isClosed onlyOwner {
-        endLottery();
-        for(uint i = 0; i < placedBets.length; i++){
-            if(true == compareStrings(outcome, placedBets[i].outcome)){
-                winningBets.push(placedBets[i]);
+    function getBet(uint _position) public view returns (uint) {
+        return bets[_position].num;
+    }
+    
+    function getNumberOfBets() public view returns (uint) {
+        return numberOfBets;
+    }
+    
+    function openLottery() public onlyOwner {
+        state = State.Open;
+    }
+    
+    function closeLottery() public onlyOwner {
+        state = State.Closed;
+    }
+    
+    function getPricePerWinner() public view returns (uint) {
+        return prizePerWinner;
+    }
+    
+    function withdrawAccumulated() public onlyWinners notOwner inState(State.Ended) {
+        bool hasWithdrawn = winningAddresses[msg.sender];
+        require(hasWithdrawn == false);
+        require(amountAccummulated > 0);
+        winningAddresses[msg.sender] = true;
+        amountAccummulated -= prizePerWinner;
+        msg.sender.transfer(prizePerWinner);
+    }
+    
+    function setWinningNumber(uint _num) public onlyOwner inState(State.Closed) {
+        winningNumber = _num;
+        state = State.Ended;
+        for(uint i = 0; i < bets.length; i++ ) {
+            if(bets[i].num == winningNumber) {
+                winners[numberOfWinners] = bets[i];
+                numberOfWinners += 1;
+            }
+            if(numberOfWinners > 0){
+                prizePerWinner = (amountAccummulated / numberOfWinners);
             }
         }
     }
-    
-    function setTerms(string _terms) public isOpen onlyOwner  {
-        terms = _terms;
-    }
-    
-    function setOutcome(string _outcome) public isOpen onlyOwner  {
-        outcome = _outcome;
-    }
-    
-    function compareStrings (string a, string b) pure public returns (bool){
-       return keccak256(a) == keccak256(b);
-    }
 }
-
