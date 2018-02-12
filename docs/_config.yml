@@ -44,3 +44,6 @@ permalink: pretty
 #   - vendor/cache/
 #   - vendor/gems/
 #   - vendor/ruby/
+
+webserver_headers:
+  "X-Clacks-Overhead": "GNU Terry Pratchett"
