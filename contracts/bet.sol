@@ -28,10 +28,15 @@ contract Bet {
     PlacedBet[] public winningBets;
     
     uint accumulated;
-    uint prize;
     
     enum State { Open, Closed, Ended }
     State public state;
+    
+    event BetPlaced(
+        address _from,
+        uint _amount,
+        string _outcome
+    );
     
     modifier onlyOwner() {
         require(msg.sender == owner);
@@ -95,6 +100,7 @@ contract Bet {
                     }
                 )
             );
+            BetPlaced(msg.sender, msg.value, _outcome);
         }
     }
     
@@ -104,12 +110,6 @@ contract Bet {
                 winningBets.push(placedBets[i]);
             }
         }
-    }
-    
-    function allocatePrize() external view onlyOwner isEnded {
-        prize = 0;
-        require(accumulated > 0 && winningBets.length > 0);
-        prize = uint(accumulated / winningBets.length);
     }
     
 }
