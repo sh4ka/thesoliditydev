@@ -23,7 +23,7 @@ parso==0.1.1
 pbkdf2==1.3
 py-solc==2.1.0
 pycparser==2.18
-pycryptodome==3.4.11
+pycryptodome==3.6.6
 pyethash==0.1.27
 pylint==1.8.1
 pylint-django==0.7.2
